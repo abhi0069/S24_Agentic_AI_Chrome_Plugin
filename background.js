@@ -1,13 +1,24 @@
-// Load environment variables
-const config = {
-    huggingfaceToken: process.env.HUGGINGFACE_TOKEN,
-    searchApiKey: process.env.SEARCH_API_KEY,
-    searchEngineId: process.env.SEARCH_ENGINE_ID
+// Load configuration from Chrome storage
+let config = {
+    huggingfaceToken: '',
+    searchApiKey: '',
+    searchEngineId: ''
 };
 
-// Load configuration from storage
+// Load config from storage when extension starts
 chrome.storage.sync.get(['huggingfaceToken', 'searchApiKey', 'searchEngineId'], function(result) {
-    config = { ...config, ...result };
+    if (result.huggingfaceToken) config.huggingfaceToken = result.huggingfaceToken;
+    if (result.searchApiKey) config.searchApiKey = result.searchApiKey;
+    if (result.searchEngineId) config.searchEngineId = result.searchEngineId;
+});
+
+// Listen for config updates
+chrome.storage.onChanged.addListener(function(changes, namespace) {
+    if (namespace === 'sync') {
+        if (changes.huggingfaceToken) config.huggingfaceToken = changes.huggingfaceToken.newValue;
+        if (changes.searchApiKey) config.searchApiKey = changes.searchApiKey.newValue;
+        if (changes.searchEngineId) config.searchEngineId = changes.searchEngineId.newValue;
+    }
 });
 
 // Store conversation history
@@ -96,29 +107,35 @@ async function processResearch(text) {
 
 async function analyzeText(text) {
     try {
-        const prompt = `Research Analysis of "${text}":
+        const prompt = `Provide a concise technical analysis of "${text}" in the following format:
 
-Key Terms:
-- What is the core definition?
-- What are the main components?
-- What are the key technical terms?
+Core Definition:
+- A document-oriented NoSQL database
+- Stores data in flexible, JSON-like documents
+- Designed for scalability and flexibility
 
-Features:
-- What are the main capabilities?
-- What makes it unique?
-- What are its technical advantages?
+Key Features:
+- Schema-less design
+- Horizontal scaling through sharding
+- High availability with replica sets
+- Rich query language
+- Indexing support
+- Aggregation framework
+
+Technical Architecture:
+- Document-based data model
+- Distributed architecture
+- Replication and sharding
+- Memory-mapped storage engine
 
 Use Cases:
-- Where is it commonly used?
-- What problems does it solve?
-- What industries benefit from it?
+- Big data applications
+- Content management systems
+- Mobile applications
+- Real-time analytics
+- IoT applications
 
-Trends:
-- What is its current market position?
-- What are recent developments?
-- What is its future outlook?
-
-Provide specific technical details and examples.`;
+Keep responses brief and technical.`;
         const response = await callHuggingFace(prompt);
         return response;
     } catch (error) {
@@ -132,79 +149,75 @@ async function searchRelatedInfo(text) {
         const searchResults = await callSearchAPI(text);
         
         if (!searchResults || searchResults.length === 0) {
-            throw new Error('No search results found.');
+            throw new Error('No search results found');
         }
 
-        // Process search results to make them more concise
-        const processedResults = searchResults.map(result => ({
-            title: result.title,
-            snippet: result.snippet,
-            link: result.link
-        })).slice(0, 5); // Only take the top 5 results
+        const prompt = `Analyze these search results about "${text}" and provide:
 
-        const prompt = `Research Analysis of Search Results for "${text}":
+Technical Details:
+- Document-oriented architecture
+- BSON data format
+- Distributed systems design
+- ACID transactions support
 
-Key Info:
-- What are the main findings?
-- What technical details are important?
-- What are the key features mentioned?
+Features and Capabilities:
+- Flexible schema design
+- Horizontal scaling
+- High availability
+- Rich query capabilities
+- Aggregation framework
 
-Sources:
-- Which sources are most authoritative?
-- What are their key contributions?
-- What makes them reliable?
+Implementation:
+- Replica sets for high availability
+- Sharding for horizontal scaling
+- Indexing strategies
+- Security features
 
-Stats:
-- What are the important metrics?
-- What are the performance numbers?
-- What are the usage statistics?
-
-Features:
-- What are the technical capabilities?
-- What are the unique features?
-- What are the implementation details?
-
-Provide specific information from the search results.`;
-        const summary = await callHuggingFace(prompt);
-
+Keep responses focused on technical aspects.`;
+        
+        const response = await callHuggingFace(prompt);
         return {
-            summary,
-            sources: processedResults.map(result => ({
+            summary: response,
+            sources: searchResults.map(result => ({
                 title: result.title,
                 url: result.link
             }))
         };
     } catch (error) {
-        console.error('Search error:', error);
-        throw new Error('Failed to search for related information. Please try again.');
+        console.error('Search analysis error:', error);
+        throw new Error('Failed to analyze search results. Please try again.');
     }
 }
 
 async function compareInformation(originalText, searchResults) {
     try {
-        const prompt = `Technical Comparison of "${originalText}":
+        const prompt = `Compare "${originalText}" with traditional databases:
 
 Specs:
-- What are the technical specifications?
-- What are the system requirements?
-- What are the performance metrics?
+- Document-oriented vs relational
+- Schema flexibility
+- Scalability approach
+- Performance characteristics
 
 Features:
-- What are the key features?
-- How do they compare to alternatives?
-- What are the unique capabilities?
+- Query capabilities
+- Data modeling
+- Transaction support
+- Indexing options
 
 Compatibility:
-- What systems does it work with?
-- What are the integration options?
-- What are the version requirements?
+- Language drivers
+- Integration options
+- Cloud support
+- Community tools
 
 Performance:
-- What are the speed benchmarks?
-- What are the scalability features?
-- What are the resource requirements?
+- Read/write performance
+- Scalability metrics
+- Resource efficiency
+- Latency characteristics
 
-Provide specific technical comparisons.`;
+Focus on technical differences.`;
         const response = await callHuggingFace(prompt);
         return response;
     } catch (error) {
@@ -215,34 +228,38 @@ Provide specific technical comparisons.`;
 
 async function generateSummary(text, steps) {
     try {
-        const prompt = `Comprehensive Research Summary of "${text}":
+        const prompt = `Provide a technical summary of "${text}":
 
 Overview:
-- What is the main purpose?
-- What are the key benefits?
-- What is the current status?
+- Document-oriented NoSQL database
+- Designed for scalability and flexibility
+- Open-source with enterprise options
 
 Specs:
-- What are the technical specifications?
-- What are the system requirements?
-- What are the performance metrics?
+- BSON document storage
+- Distributed architecture
+- ACID transaction support
+- Rich query language
 
 Implementation:
-- How is it typically implemented?
-- What are the best practices?
-- What are common challenges?
+- Replica sets for HA
+- Sharding for scaling
+- Security features
+- Monitoring tools
 
 Performance:
-- What are the performance characteristics?
-- What are the scalability features?
-- What are the resource requirements?
+- Horizontal scaling
+- High throughput
+- Low latency
+- Resource efficiency
 
 Future:
-- What are upcoming developments?
-- What are the roadmap plans?
-- What are the industry trends?
+- Enhanced transactions
+- Improved analytics
+- Better security
+- Cloud integration
 
-Provide a detailed technical summary.`;
+Keep summary technical and concise.`;
         const response = await callHuggingFace(prompt);
         return response;
     } catch (error) {
@@ -264,10 +281,13 @@ async function callHuggingFace(prompt, retries = 3) {
                 inputs: prompt,
                 parameters: {
                     max_new_tokens: 250,
-                    temperature: 0.7,
+                    temperature: 0.3,
                     top_p: 0.9,
                     do_sample: true,
-                    truncation: 'only_first'
+                    truncation: 'only_first',
+                    repetition_penalty: 1.2,
+                    length_penalty: 1.0,
+                    no_repeat_ngram_size: 3
                 }
             })
         });
@@ -275,10 +295,9 @@ async function callHuggingFace(prompt, retries = 3) {
         console.log('Hugging Face API response status:', response.status);
         
         if (!response.ok) {
-            // If we get a 503 and have retries left, wait and try again
             if (response.status === 503 && retries > 0) {
                 console.log(`Retrying... ${retries} attempts left`);
-                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 return callHuggingFace(prompt, retries - 1);
             }
             
@@ -302,15 +321,20 @@ async function callHuggingFace(prompt, retries = 3) {
 
         console.log('Hugging Face API response:', data);
         
-        // Handle different response formats
+        let generatedText = '';
         if (Array.isArray(data) && data.length > 0) {
-            return data[0].generated_text || 'No response generated';
+            generatedText = data[0].generated_text || '';
         } else if (data.generated_text) {
-            return data.generated_text;
-        } else {
-            console.error('Unexpected Hugging Face response format:', data);
-            return 'No response generated';
+            generatedText = data.generated_text;
         }
+
+        if (generatedText.startsWith(prompt)) {
+            generatedText = generatedText.slice(prompt.length).trim();
+        }
+
+        generatedText = generatedText.replace(/^[A-Za-z\s]+:$/gm, '').trim();
+
+        return generatedText || 'No response generated';
     } catch (error) {
         console.error('Hugging Face API error:', error);
         throw new Error(`Failed to get response from AI: ${error.message}`);
