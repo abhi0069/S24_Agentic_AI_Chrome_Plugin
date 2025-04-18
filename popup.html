@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Research Assistant</title>
+    <link rel="stylesheet" href="popup.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Research Assistant</h1>
+            <p class="subtitle">Your AI-powered research companion</p>
+        </header>
+
+        <div class="input-section">
+            <textarea id="researchText" placeholder="Enter text to research..."></textarea>
+            <button id="researchButton" class="primary-button">
+                <span class="button-text">Research</span>
+                <span class="loading-spinner"></span>
+            </button>
+        </div>
+
+        <div id="results" class="results-container">
+            <div class="research-steps">
+                <!-- Steps will be added here dynamically -->
+            </div>
+        </div>
+
+        <div id="error" class="error-message"></div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html> 
