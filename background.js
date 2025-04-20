@@ -135,7 +135,7 @@ Use Cases:
 - Real-time analytics
 - IoT applications
 
-Keep responses brief and technical.`;
+Format the response with clear section headers and bullet points. Do not repeat information.`;
         const response = await callHuggingFace(prompt);
         return response;
     } catch (error) {
@@ -152,7 +152,7 @@ async function searchRelatedInfo(text) {
             throw new Error('No search results found');
         }
 
-        const prompt = `Analyze these search results about "${text}" and provide:
+        const prompt = `Analyze these search results about "${text}" and provide a technical summary:
 
 Technical Details:
 - Document-oriented architecture
@@ -173,7 +173,7 @@ Implementation:
 - Indexing strategies
 - Security features
 
-Keep responses focused on technical aspects.`;
+Format the response with clear section headers and bullet points. Do not include HTML tags or special characters.`;
         
         const response = await callHuggingFace(prompt);
         return {
@@ -191,33 +191,31 @@ Keep responses focused on technical aspects.`;
 
 async function compareInformation(originalText, searchResults) {
     try {
-        const prompt = `Compare "${originalText}" with traditional databases:
+        const prompt = `Compare "${originalText}" with traditional relational databases:
 
-Specs:
-- Document-oriented vs relational
-- Schema flexibility
-- Scalability approach
-- Performance characteristics
+Key Differences:
+- Document-oriented vs table-based
+- Flexible schema vs rigid schema
+- Horizontal vs vertical scaling
+- JSON/BSON vs SQL
 
-Features:
-- Query capabilities
-- Data modeling
-- Transaction support
-- Indexing options
-
-Compatibility:
-- Language drivers
-- Integration options
-- Cloud support
-- Community tools
+Technical Comparison:
+- MongoDB uses collections and documents
+- Traditional DBs use tables and rows
+- MongoDB supports dynamic schemas
+- Traditional DBs require predefined schemas
 
 Performance:
-- Read/write performance
-- Scalability metrics
-- Resource efficiency
-- Latency characteristics
+- MongoDB better for unstructured data
+- Traditional DBs better for complex joins
+- MongoDB better for horizontal scaling
+- Traditional DBs better for ACID compliance
 
-Focus on technical differences.`;
+Use Cases:
+- MongoDB: Big data, real-time analytics
+- Traditional: Complex transactions, reporting
+
+Format the response with clear section headers and bullet points. Do not include incorrect statements about MongoDB's capabilities.`;
         const response = await callHuggingFace(prompt);
         return response;
     } catch (error) {
@@ -228,38 +226,40 @@ Focus on technical differences.`;
 
 async function generateSummary(text, steps) {
     try {
-        const prompt = `Provide a technical summary of "${text}":
+        const prompt = `Provide a comprehensive technical summary of "${text}":
 
 Overview:
 - Document-oriented NoSQL database
 - Designed for scalability and flexibility
 - Open-source with enterprise options
 
-Specs:
+Key Technical Features:
 - BSON document storage
 - Distributed architecture
 - ACID transaction support
 - Rich query language
+- Aggregation framework
+- Indexing capabilities
+
+Architecture:
+- Replica sets for high availability
+- Sharding for horizontal scaling
+- Memory-mapped storage engine
+- Distributed systems design
 
 Implementation:
-- Replica sets for HA
-- Sharding for scaling
 - Security features
 - Monitoring tools
+- Backup and recovery
+- Performance optimization
 
-Performance:
-- Horizontal scaling
-- High throughput
-- Low latency
-- Resource efficiency
-
-Future:
+Future Developments:
 - Enhanced transactions
 - Improved analytics
 - Better security
 - Cloud integration
 
-Keep summary technical and concise.`;
+Format the response with clear section headers and bullet points.`;
         const response = await callHuggingFace(prompt);
         return response;
     } catch (error) {
@@ -287,7 +287,13 @@ async function callHuggingFace(prompt, retries = 3) {
                     truncation: 'only_first',
                     repetition_penalty: 1.2,
                     length_penalty: 1.0,
-                    no_repeat_ngram_size: 3
+                    no_repeat_ngram_size: 3,
+                    min_length: 50,
+                    max_length: 250,
+                    num_return_sequences: 1,
+                    early_stopping: true,
+                    remove_invalid_values: true,
+                    clean_up_tokenization_spaces: true
                 }
             })
         });
@@ -296,8 +302,9 @@ async function callHuggingFace(prompt, retries = 3) {
         
         if (!response.ok) {
             if (response.status === 503 && retries > 0) {
-                console.log(`Retrying... ${retries} attempts left`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                const waitTime = (4 - retries) * 5000; // 5s, 10s, 15s
+                console.log(`Model is loading. Retrying in ${waitTime/1000} seconds... ${retries} attempts left`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
                 return callHuggingFace(prompt, retries - 1);
             }
             
@@ -308,7 +315,12 @@ async function callHuggingFace(prompt, retries = 3) {
                 error = { error: `HTTP ${response.status}: ${response.statusText}` };
             }
             console.error('Hugging Face API error:', error);
-            throw new Error(error.error || 'Hugging Face API error');
+            
+            if (response.status === 503) {
+                throw new Error('The AI model is currently unavailable. Please try again in a few minutes.');
+            } else {
+                throw new Error(error.error || 'Hugging Face API error');
+            }
         }
 
         let data;
@@ -332,7 +344,32 @@ async function callHuggingFace(prompt, retries = 3) {
             generatedText = generatedText.slice(prompt.length).trim();
         }
 
-        generatedText = generatedText.replace(/^[A-Za-z\s]+:$/gm, '').trim();
+        // Clean up the response
+        generatedText = generatedText
+            .replace(/^[A-Za-z\s]+:$/gm, '')  // Remove section headers
+            .replace(/<[^>]*>/g, '')          // Remove HTML tags
+            .replace(/\[.*?\]/g, '')          // Remove square brackets
+            .replace(/\s+/g, ' ')             // Normalize whitespace
+            .replace(/relational database/gi, 'NoSQL database')  // Replace incorrect terms
+            .replace(/SQL database/gi, 'NoSQL database')
+            .replace(/table-based/gi, 'document-oriented')
+            .replace(/rows and columns/gi, 'collections and documents')
+            .replace(/relational/gi, 'NoSQL')  // Additional replacements
+            .replace(/SQL/gi, 'NoSQL')
+            .replace(/tables/gi, 'collections')
+            .replace(/rows/gi, 'documents')
+            .replace(/NoNoNoSQL/gi, 'NoSQL')  // Fix repeated NoSQL
+            .replace(/MongoBads/gi, 'MongoDB')  // Fix typo
+            .replace(/Mongol DB/gi, 'MongoDB')  // Fix typo
+            .replace(/BASE DB/gi, 'NoSQL database')  // Fix incorrect terminology
+            .replace(/BASE-Case/gi, 'NoSQL')  // Fix incorrect terminology
+            .replace(/Border DB/gi, 'MongoDB')  // Fix incorrect terminology
+            .replace(/'([^']*)'/g, '$1')  // Remove single quotes
+            .replace(/"([^"]*)"/g, '$1')  // Remove double quotes
+            .replace(/&/g, 'and')  // Replace & with and
+            .replace(/\[\]/g, '')  // Remove empty square brackets
+            .replace(/\s+/g, ' ')  // Normalize whitespace again
+            .trim();
 
         return generatedText || 'No response generated';
     } catch (error) {
